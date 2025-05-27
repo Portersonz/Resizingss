@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Resizer with Background Removal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            padding: 30px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: #2c3e50;
+        }
+
+        .upload-section {
+            border: 3px dashed #e0e6ed;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-section:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+
+        .upload-subtext {
+            font-size: 0.9rem;
+            color: #7f8c8d;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .processing-section {
+            display: none;
+            text-align: center;
+            padding: 30px;
+        }
+
+        .image-preview {
+            max-width: 300px;
+            max-height: 300px;
+            border-radius: 10px;
+            margin: 20px auto;
+        }
+
+        .resize-options {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin: 25px 0;
+        }
+
+        .resize-options h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .option-group {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+        }
+
+        .option-group label {
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 15px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .result-section {
+            display: none;
+            text-align: center;
+            padding: 30px;
+            background: #f8fff8;
+            border-radius: 15px;
+            margin-top: 30px;
+        }
+
+        .download-btn {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+        }
+
+        #canvas {
+            max-width: 100%;
+            height: auto;
+            border-radius: 10px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🖼️ Image Resizer</h1>
+            <p>Resize your images to 1600×2000 pixels with perfect fit</p>
+        </div>
+
+        <div class="upload-section" id="uploadSection">
+            <div class="upload-text">Drop your images here or click to browse</div>
+            <div class="upload-subtext">Supports JPG, PNG, WebP formats</div>
+            <input type="file" id="fileInput" accept="image/*">
+        </div>
+
+        <div class="processing-section" id="processingSection">
+            <img id="imagePreview" class="image-preview" alt="Preview">
+            
+            <div class="resize-options">
+                <h3>Resize Options</h3>
+                <div class="option-group">
+                    <label>Background Color:</label>
+                    <span>#f6f6f6 (Fixed)</span>
+                </div>
+                <button class="btn" id="resizeBtn">
+                    Resize Image
+                    <span id="loadingSpinner" class="loading" style="display: none;"></span>
+                </button>
+            </div>
+        </div>
+
+        <div class="result-section" id="resultSection">
+            <h3>✅ Resized Successfully!</h3>
+            <div class="canvas-container">
+                <canvas id="canvas" width="1600" height="2000"></canvas>
+            </div>
+            <button class="btn download-btn" id="downloadBtn">Download Resized Image</button>
+            <button class="btn" id="processAnotherBtn">Process Another Image</button>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const preview = document.getElementById('imagePreview');
+        const resizeBtn = document.getElementById('resizeBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const apiKey = 'd64cec90279d4bdaa62e53ad28619cca';  // Your Slazzer API key
+        const backgroundColor = '#f6f6f6'; // Background color to fill after background removal
+
+        fileInput.addEventListener('change', async function (event) {
+            const file = event.target.files[0];
+            if (file) {
+                preview.style.display = 'block';
+                preview.src = URL.createObjectURL(file);
+
+                // Upload the image to Slazzer API for background removal
+                await removeBackground(file);
+            }
+        });
+
+        async function removeBackground(file) {
+            const formData = new FormData();
+            formData.append('image_file', file);
+            formData.append('size', 'auto'); // auto sizing by default
+
+            try {
+                const response = await fetch('https://api.slazzer.com/v1/remove', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                    },
+                    body: formData,
+                });
+
+                const result = await response.blob();
+                const url = URL.createObjectURL(result);
+                preview.src = url;
+
+                // Now that we have the background-removed image, we can resize it.
+                resizeImage(url);
+            } catch (error) {
+                console.error('Error removing background:', error);
+            }
+        }
+
+        function resizeImage(url) {
+            const img = new Image();
+            img.src = url;
+            img.onload = function () {
+                // Fill the background with #f6f6f6 color
+                ctx.fillStyle = backgroundColor;
+                ctx.fillRect(0, 0, 1600, 2000);  // Fill the entire canvas with the background color
+
+                // Calculate the dimensions to maintain the aspect ratio
+                const imgRatio = img.width / img.height;
+                const targetRatio = 1600 / 2000;
+
+                let width, height, x, y;
+
+                if (imgRatio > targetRatio) {
+                    width = 1600;
+                    height = 1600 / imgRatio;
+                    x = 0;
+                    y = (2000 - height) / 2;
+                } else {
+                    height = 2000;
+                    width = 2000 * imgRatio;
+                    x = (1600 - width) / 2;
+                    y = 0;
+                }
+
+                // Draw the resized image on the canvas
+                ctx.drawImage(img, x, y, width, height);
+
+                // Show the download button after processing
+                resizeBtn.style.display = 'none';
+                downloadBtn.style.display = 'block';
+
+                downloadBtn.addEventListener('click', function () {
+                    const imageURL = canvas.toDataURL('image/jpeg');
+                    const a = document.createElement('a');
+                    a.href = imageURL;
+                    a.download = 'resized-image.jpg';
+                    a.click();
+                });
+            };
+        }
+    </script>
+</body>
+</html>
